@@ -1,5 +1,6 @@
 """
-Create chirality mask.
+Create chirality masks for age-specific templates used for correcting chirality of segmentations generated with nnU-Net (see 
+https://github.com/DCAN-Labs/CABINET/tree/main/bin). The nifti_input_file_path should be a segmentation file.
 
 Usage:
   create_chirality_mask <nifti_input_file_path> <segment_lookup_table> <nifti_output_file_path>
@@ -37,7 +38,8 @@ def correct_chirality_mask(nifti_input_file_path, segment_lookup_table, nifti_ou
     fix_overlap_values(nifti_output_file_path)
 
 
-def fill_in_holes(nifti_output_file_path):
+def fill_in_holes(nifti_output_file_path): 
+    # this function fills any holes in the mask resulting from holes present in the segmentation file
     os.system('module load fsl')
 
     # create working directory to store intermediate outputs that can be deleted after
@@ -105,6 +107,10 @@ def fill_in_holes(nifti_output_file_path):
 
 
 def fix_overlap_values(nifti_output_file_path):
+    # This function corrects for mask values of 4, 5, and 6 that result from overlap of L, R, and/or M labels being recombined after having holes 
+    # filled by fill_in_holes. Values of 4, 5, and 6 are replaced by the corresponding values taken from the L/R mask prior to having holes filled.
+    # Note that this will not correct for values of 3 that result from overlap of L and R labels at the midline
+    
     # load original and filled LR mask data
     orig_l_r_mask_img = nib.load(nifti_output_file_path)
     orig_l_r_mask_data = orig_l_r_mask_img.get_fdata()
@@ -112,7 +118,7 @@ def fix_overlap_values(nifti_output_file_path):
     fill_l_r_mask_img = nib.load('filled_mask.nii.gz')
     fill_l_r_mask_data = fill_l_r_mask_img.get_fdata()
 
-    # Flatten numpy arrays
+    # Flatten numpy arrays to make iteration over coordinates faster
     orig_l_r_mask_data_2_d = orig_l_r_mask_data.reshape((182, 39676), order='C')
     orig_l_r_mask_data_1_d = orig_l_r_mask_data_2_d.reshape(7221032, order='C')
 
@@ -131,8 +137,7 @@ def fix_overlap_values(nifti_output_file_path):
     percentage_mislabeled = total / num_nonzeros
     percentage_mislabeled = round(percentage_mislabeled, 5)
     print("{} out of {} voxels ({}%) have a value of 4, 5, or 6".format(total, num_nonzeros, percentage_mislabeled))
-    print(
-        "Replacing voxel values of 4, 5, or 6 with equivalent voxel label alues from initial L/R mask created before "
+    print("Replacing voxel values of 4, 5, or 6 with equivalent voxel label alues from initial L/R mask created before "
         "filling holes...")
 
     # Replace overlapping label values with corresponding label values from initial mask
